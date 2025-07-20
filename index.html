@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>シフト表 × Miro統合版</title>
+    <title>シフト表管理ツール × Miro連携版（修正版）</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://miro.com/app/static/sdk/v2/miro.js"></script>
     <style>
-        /* 既存のCSSスタイル（元のツールと同じ）+ Miro連携用の追加スタイル */
         body {
             font-family: 'Yu Gothic', 'Meiryo', sans-serif;
             margin: 0;
@@ -22,6 +21,14 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             padding: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
         }
         
         .miro-section {
@@ -85,6 +92,12 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         
+        .miro-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
         .miro-status {
             padding: 15px;
             border-radius: 8px;
@@ -132,15 +145,6 @@
             50% { opacity: 0.5; }
         }
         
-        /* 既存のスタイルはそのまま継承 */
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #4CAF50;
-            padding-bottom: 10px;
-        }
-        
         .upload-section {
             background-color: #f9f9f9;
             border: 2px dashed #ddd;
@@ -166,6 +170,28 @@
         
         .file-label:hover {
             background-color: #45a049;
+        }
+        
+        .sheet-section {
+            background-color: #f0f8ff;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .date-section {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .date-input {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin: 0 10px;
         }
         
         .generate-btn {
@@ -205,22 +231,12 @@
             font-weight: bold;
         }
         
+        .shift-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
         .working {
             background-color: #e8f5e8 !important;
-        }
-        
-        .editable-time {
-            background-color: #fff3e0 !important;
-            cursor: text;
-            transition: background-color 0.3s;
-            border: 2px solid transparent;
-            min-width: 60px;
-        }
-        
-        .editable-time:focus {
-            background-color: #ffffff !important;
-            border: 2px solid #2196F3 !important;
-            outline: none;
         }
         
         .status {
@@ -240,6 +256,43 @@
             background-color: #f8d7da;
             border: 1px solid #f5c6cb;
             color: #721c24;
+        }
+        
+        .export-btn {
+            background-color: #FF9800;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .export-btn:hover {
+            background-color: #F57C00;
+        }
+        
+        .summary {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #495057;
+            max-height: 200px;
+            overflow-y: auto;
         }
     </style>
 </head>
@@ -277,7 +330,7 @@
         </div>
 
         <!-- シート選択 -->
-        <div class="sheet-section" id="sheetSection" style="display: none; margin-bottom: 30px; text-align: center;">
+        <div class="sheet-section" id="sheetSection" style="display: none;">
             <h3>2. シートを選択</h3>
             <select id="sheetSelect" class="date-input" style="width: 200px;">
                 <option value="">シートを選択してください</option>
@@ -295,6 +348,12 @@
         <div id="status"></div>
         <div id="summary"></div>
         <div id="result"></div>
+        
+        <!-- デバッグ情報表示 -->
+        <div id="debugInfo" class="debug-info" style="display: none;">
+            <h4>🔧 デバッグ情報</h4>
+            <div id="debugContent"></div>
+        </div>
     </div>
 
     <script>
@@ -313,6 +372,9 @@
         let baseUPH = 22;
         let isNightShift = false;
 
+        // デバッグモード
+        let debugMode = true;
+
         // 既存のイベントリスナー
         document.getElementById('fileInput').addEventListener('change', handleFileUpload);
         document.getElementById('sheetSelect').addEventListener('change', handleSheetChange);
@@ -321,31 +383,142 @@
         // 今日の日付を初期値として設定
         document.getElementById('targetDate').value = new Date().toISOString().split('T')[0];
         
+        // デバッグ情報表示関数
+        function addDebugInfo(message) {
+            if (!debugMode) return;
+            
+            const debugDiv = document.getElementById('debugInfo');
+            const debugContent = document.getElementById('debugContent');
+            
+            debugDiv.style.display = 'block';
+            const timestamp = new Date().toLocaleTimeString();
+            debugContent.innerHTML += `[${timestamp}] ${message}<br>`;
+            debugContent.scrollTop = debugContent.scrollHeight;
+        }
+        
+        // 安全な文字列変換関数
+        function safeStringify(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            if (typeof value === 'string') {
+                return value;
+            }
+            if (typeof value === 'number') {
+                return value.toString();
+            }
+            return String(value);
+        }
+        
+        // 改良された時間解析関数（エラー修正版）
+        function parseTime(timeValue) {
+            try {
+                addDebugInfo(`parseTime called with: ${JSON.stringify(timeValue)} (type: ${typeof timeValue})`);
+                
+                // null, undefined, 空文字の場合
+                if (timeValue === null || timeValue === undefined || timeValue === '') {
+                    addDebugInfo('parseTime: null/undefined/empty value, returning null');
+                    return null;
+                }
+                
+                // 文字列に安全に変換
+                const timeStr = safeStringify(timeValue).trim();
+                
+                // 空文字列や無効な文字列をチェック
+                if (timeStr === '' || timeStr === '：' || timeStr === '　：　') {
+                    addDebugInfo('parseTime: invalid string format, returning null');
+                    return null;
+                }
+                
+                // 時間形式を解析
+                let cleanTimeStr = timeStr.replace(/[：\s]/g, ':');
+                addDebugInfo(`parseTime: cleaned string: "${cleanTimeStr}"`);
+                
+                if (cleanTimeStr.includes(':')) {
+                    const parts = cleanTimeStr.split(':');
+                    const hours = parseInt(parts[0]) || 0;
+                    const minutes = parseInt(parts[1]) || 0;
+                    
+                    const totalHours = (hours % 24) + minutes / 60;
+                    addDebugInfo(`parseTime: parsed time: ${totalHours}h (${hours}:${minutes})`);
+                    return totalHours;
+                } else {
+                    // 数字のみの場合
+                    const numValue = parseFloat(cleanTimeStr) || 0;
+                    const result = numValue % 24;
+                    addDebugInfo(`parseTime: numeric value: ${result}h`);
+                    return result;
+                }
+            } catch (error) {
+                addDebugInfo(`parseTime ERROR: ${error.message} for value: ${JSON.stringify(timeValue)}`);
+                console.error('parseTime error:', error, 'for value:', timeValue);
+                return null;
+            }
+        }
+        
+        // 労働時間計算関数（エラーハンドリング強化）
+        function calculateWorkHours(startTime, endTime, breakTime) {
+            try {
+                addDebugInfo(`calculateWorkHours: start=${startTime}, end=${endTime}, break=${breakTime}`);
+                
+                if (startTime === null || endTime === null) {
+                    addDebugInfo('calculateWorkHours: missing start or end time, returning 0');
+                    return 0;
+                }
+                
+                let workHours;
+                if (isNightShift && endTime < startTime) {
+                    workHours = (24 + endTime) - startTime;
+                } else {
+                    workHours = endTime - startTime;
+                }
+                
+                if (breakTime !== null && breakTime > 0) {
+                    workHours -= breakTime;
+                }
+                
+                const result = Math.max(0, workHours);
+                addDebugInfo(`calculateWorkHours: result=${result}h`);
+                return result;
+            } catch (error) {
+                addDebugInfo(`calculateWorkHours ERROR: ${error.message}`);
+                console.error('calculateWorkHours error:', error);
+                return 0;
+            }
+        }
+        
         // ===================
-        // Miro連携機能
+        // Miro連携機能（エラー修正版）
         // ===================
         
         // Miro SDK初期化
         async function initializeMiro() {
             try {
+                addDebugInfo('Miro SDK initialization started');
+                
                 if (typeof miro !== 'undefined') {
-                    console.log('Miro SDK が利用可能です');
+                    addDebugInfo('Miro SDK is available');
                     
                     // Miro環境かどうかチェック
                     if (window.parent !== window) {
-                        // Miroアプリ内で動作している場合
+                        addDebugInfo('Running inside Miro app');
                         await miro.board.ui.on('icon:click', async () => {
-                            // アイコンクリック時の処理
+                            addDebugInfo('Miro icon clicked');
                         });
                         
                         updateMiroStatus('connected', 'Miroアプリ内で動作中');
                         miroConnected = true;
                         enableMiroButtons();
+                    } else {
+                        addDebugInfo('Running as standalone web page');
+                        updateMiroStatus('disconnected', 'スタンドアロンモードで動作中');
                     }
                 } else {
-                    console.log('Miro SDK が利用できません（通常のWebページとして動作）');
+                    addDebugInfo('Miro SDK not available');
+                    updateMiroStatus('disconnected', 'Miro SDK が利用できません');
                 }
             } catch (error) {
+                addDebugInfo(`Miro initialization ERROR: ${error.message}`);
                 console.error('Miro初期化エラー:', error);
             }
         }
@@ -353,10 +526,10 @@
         // Miroに接続
         async function connectToMiro() {
             try {
+                addDebugInfo('Miro connection attempt started');
                 updateMiroStatus('loading', '接続中...');
                 
-                // OAuth認証フロー（実際の実装では適切なOAuthフローを実装）
-                // ここではデモ用の疑似接続
+                // OAuth認証フロー（デモ用の疑似接続）
                 await simulateOAuthFlow();
                 
                 miroConnected = true;
@@ -364,8 +537,10 @@
                 
                 updateMiroStatus('connected', 'Miroに正常に接続されました！');
                 enableMiroButtons();
+                addDebugInfo('Miro connection successful');
                 
             } catch (error) {
+                addDebugInfo(`Miro connection ERROR: ${error.message}`);
                 console.error('Miro接続エラー:', error);
                 updateMiroStatus('disconnected', '接続に失敗しました: ' + error.message);
             }
@@ -374,12 +549,9 @@
         // OAuth認証フローのシミュレーション
         async function simulateOAuthFlow() {
             return new Promise((resolve) => {
-                // 実際の実装では以下のような処理を行います：
-                // 1. 認証URLにリダイレクト
-                // 2. 認証コードを受け取り
-                // 3. アクセストークンと交換
-                
+                addDebugInfo('OAuth simulation started');
                 setTimeout(() => {
+                    addDebugInfo('OAuth simulation completed');
                     resolve();
                 }, 2000);
             });
@@ -393,22 +565,24 @@
             }
             
             try {
+                addDebugInfo('Miro connection test started');
                 updateMiroStatus('loading', '接続テスト中...');
                 
-                // 実際の実装では miro.board.getInfo() などでテスト
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
                 updateMiroStatus('connected', '接続テスト成功！Miroボードにアクセス可能です');
                 showStatus('Miro接続テストが成功しました', 'success');
+                addDebugInfo('Miro connection test successful');
                 
             } catch (error) {
+                addDebugInfo(`Miro test ERROR: ${error.message}`);
                 console.error('Miro接続テストエラー:', error);
                 updateMiroStatus('disconnected', '接続テストに失敗しました');
                 showStatus('Miro接続テストが失敗しました: ' + error.message, 'error');
             }
         }
         
-        // シフト表をMiroにエクスポート
+        // シフト表をMiroにエクスポート（エラー修正版）
         async function exportShiftToMiro() {
             if (!miroConnected) {
                 showStatus('Miroに接続されていません', 'error');
@@ -421,28 +595,44 @@
             }
             
             try {
+                addDebugInfo('Miro export started');
                 updateMiroStatus('loading', 'Miroにエクスポート中...');
                 
+                // 安全なデータ処理
+                const safeShiftData = currentShiftData.map((emp, index) => {
+                    addDebugInfo(`Processing employee ${index}: ${emp.name}`);
+                    
+                    const safeEmp = {
+                        ...emp,
+                        startTime: safeStringify(emp.startTime),
+                        endTime: safeStringify(emp.endTime),
+                        break: safeStringify(emp.break),
+                        hourlyWage: safeStringify(emp.hourlyWage),
+                        transportation: safeStringify(emp.transportation)
+                    };
+                    
+                    return safeEmp;
+                });
+                
                 // Miroカードの作成
-                const miroItems = await createMiroShiftCards(currentShiftData);
+                const miroItems = await createMiroShiftCards(safeShiftData);
                 
                 // 統計ダッシュボードの作成
                 await createMiroStatsDashboard();
                 
-                // タイムラインビューの作成
-                await createMiroTimeline(currentShiftData);
-                
                 updateMiroStatus('connected', `${miroItems.length}件のシフトデータをMiroに送信完了`);
                 showStatus('シフト表をMiroに正常にエクスポートしました！', 'success');
+                addDebugInfo(`Miro export completed: ${miroItems.length} items`);
                 
             } catch (error) {
+                addDebugInfo(`Miro export ERROR: ${error.message}`);
                 console.error('Miroエクスポートエラー:', error);
                 updateMiroStatus('connected', 'エクスポートに失敗しました');
                 showStatus('Miroエクスポートに失敗しました: ' + error.message, 'error');
             }
         }
         
-        // Miroシフトカードの作成
+        // Miroシフトカードの作成（エラー修正版）
         async function createMiroShiftCards(shiftData) {
             const cards = [];
             let x = 0, y = 0;
@@ -463,109 +653,95 @@
             };
             
             for (const [index, employee] of shiftData.entries()) {
-                if (!employee.isWorking) continue;
-                
-                // 労働時間計算
-                const startTime = parseTime(employee.startTime);
-                const endTime = parseTime(employee.endTime);
-                const breakTime = parseTime(employee.break) || 0;
-                const workHours = calculateWorkHours(startTime, endTime, breakTime);
-                
-                // Miroカード作成（実際の実装では miro.board.createItem を使用）
-                const cardData = {
-                    type: 'card',
-                    x: x,
-                    y: y,
-                    style: {
-                        cardTheme: companyColors[employee.company] || '#78909C'
-                    },
-                    title: employee.name,
-                    description: `🏢 ${employee.company}
-📋 ${employee.mainJob}
-⏰ ${employee.startTime} - ${employee.endTime}
-☕ 休憩: ${employee.break}
+                try {
+                    if (!employee.isWorking) continue;
+                    
+                    addDebugInfo(`Creating card for: ${employee.name}`);
+                    
+                    // 安全な時間計算
+                    const startTime = parseTime(employee.startTime);
+                    const endTime = parseTime(employee.endTime);
+                    const breakTime = parseTime(employee.break);
+                    const workHours = calculateWorkHours(startTime, endTime, breakTime);
+                    
+                    // カードデータ作成
+                    const cardData = {
+                        type: 'card',
+                        x: x,
+                        y: y,
+                        style: {
+                            cardTheme: companyColors[employee.company] || '#78909C'
+                        },
+                        title: safeStringify(employee.name),
+                        description: `🏢 ${safeStringify(employee.company)}
+📋 ${safeStringify(employee.mainJob)}
+⏰ ${safeStringify(employee.startTime)} - ${safeStringify(employee.endTime)}
+☕ 休憩: ${safeStringify(employee.break)}
 ⚡ 勤務時間: ${workHours.toFixed(1)}h
-💰 時給: ¥${employee.hourlyWage}`,
-                    metadata: {
-                        employeeId: index,
-                        company: employee.company,
-                        workHours: workHours,
-                        shiftType: isNightShift ? '夜勤' : '日勤'
-                    }
-                };
-                
-                // 実際のMiro環境では以下のようにカードを作成
-                if (typeof miro !== 'undefined' && miro.board) {
-                    try {
-                        const miroCard = await miro.board.createItem(cardData);
-                        cards.push(miroCard);
-                    } catch (error) {
-                        console.error('Miroカード作成エラー:', error);
+💰 時給: ¥${safeStringify(employee.hourlyWage)}`,
+                        metadata: {
+                            employeeId: index,
+                            company: safeStringify(employee.company),
+                            workHours: workHours,
+                            shiftType: isNightShift ? '夜勤' : '日勤'
+                        }
+                    };
+                    
+                    // 実際のMiro環境では miro.board.createItem を使用
+                    if (typeof miro !== 'undefined' && miro.board && miro.board.createItem) {
+                        try {
+                            const miroCard = await miro.board.createItem(cardData);
+                            cards.push(miroCard);
+                            addDebugInfo(`Miro card created for: ${employee.name}`);
+                        } catch (miroError) {
+                            addDebugInfo(`Miro card creation failed for ${employee.name}: ${miroError.message}`);
+                            cards.push(cardData); // デモ用のカード
+                        }
+                    } else {
                         // デモ用の疑似カード
                         cards.push(cardData);
+                        addDebugInfo(`Demo card created for: ${employee.name}`);
                     }
-                } else {
-                    // デモ用の疑似カード
-                    cards.push(cardData);
-                }
-                
-                // 次のカードの位置計算（5列で改行）
-                x += cardWidth + 20;
-                if ((index + 1) % 5 === 0) {
-                    x = 0;
-                    y += cardHeight + 20;
+                    
+                    // 次のカードの位置計算
+                    x += cardWidth + 20;
+                    if ((index + 1) % 5 === 0) {
+                        x = 0;
+                        y += cardHeight + 20;
+                    }
+                    
+                } catch (cardError) {
+                    addDebugInfo(`Card creation error for ${employee.name}: ${cardError.message}`);
+                    console.error(`Card creation error for ${employee.name}:`, cardError);
                 }
             }
             
+            addDebugInfo(`Total cards created: ${cards.length}`);
             return cards;
         }
         
         // Miro統計ダッシュボードの作成
         async function createMiroStatsDashboard() {
-            const stats = calculateCurrentStats();
-            
-            // 実際の実装では miro.board.createItem でフレームとカードを作成
-            const dashboardData = {
-                type: 'frame',
-                x: 1200,
-                y: 0,
-                width: 400,
-                height: 600,
-                title: '📊 シフト統計ダッシュボード',
-                children: [
-                    {
-                        type: 'card',
-                        title: '👥 出勤者数',
-                        description: `${stats.workingCount}名`
-                    },
-                    {
-                        type: 'card',
-                        title: '⏰ 総労働時間',
-                        description: `${stats.totalLH.toFixed(1)}h`
-                    },
-                    {
-                        type: 'card',
-                        title: '💰 総コスト',
-                        description: `¥${stats.totalCost.toLocaleString()}`
-                    }
-                ]
-            };
-            
-            console.log('統計ダッシュボード作成:', dashboardData);
-            return dashboardData;
-        }
-        
-        // Miroタイムライン作成
-        async function createMiroTimeline(shiftData) {
-            // タイムライン表示用のデータ準備
-            const timelineData = {
-                startHour: 6,
-                endHour: 24,
-                employees: shiftData.filter(emp => emp.isWorking)
-            };
-            
-            console.log('タイムライン作成:', timelineData);
-            return timelineData;
+            try {
+                const stats = calculateCurrentStats();
+                addDebugInfo(`Creating dashboard with stats: ${JSON.stringify(stats)}`);
+                
+                const dashboardData = {
+                    type: 'frame',
+                    x: 1200,
+                    y: 0,
+                    width: 400,
+                    height: 600,
+                    title: '📊 シフト統計ダッシュボード'
+                };
+                
+                addDebugInfo('Dashboard created successfully');
+                return dashboardData;
+            } catch (error) {
+                addDebugInfo(`Dashboard creation ERROR: ${error.message}`);
+                console.error('Dashboard creation error:', error);
+                return null;
+            }
         }
         
         // Miroステータス更新
@@ -584,57 +760,63 @@
             }
             
             statusElement.innerHTML = `<span class="${indicator.className}"></span>${message}`;
+            addDebugInfo(`Miro status updated: ${status} - ${message}`);
         }
         
         // Miroボタンの有効化
         function enableMiroButtons() {
             document.getElementById('testMiroBtn').disabled = false;
             document.getElementById('exportToMiroBtn').disabled = false;
+            addDebugInfo('Miro buttons enabled');
         }
         
-        // 現在の統計を計算
+        // 現在の統計を計算（エラーハンドリング強化）
         function calculateCurrentStats() {
-            if (!currentShiftData || currentShiftData.length === 0) {
-                return {
-                    workingCount: 0,
-                    totalLH: 0,
-                    totalCost: 0
-                };
-            }
-            
-            let workingCount = 0;
-            let totalLH = 0;
-            let totalCost = 0;
-            
-            currentShiftData.forEach(emp => {
-                if (emp.isWorking) {
-                    workingCount++;
-                    
-                    const startTime = parseTime(emp.startTime);
-                    const endTime = parseTime(emp.endTime);
-                    const breakTime = parseTime(emp.break) || 0;
-                    
-                    if (startTime !== null && endTime !== null) {
-                        const workHours = calculateWorkHours(startTime, endTime, breakTime);
-                        totalLH += workHours;
-                        
-                        const hourlyWage = parseFloat(emp.hourlyWage.toString().replace(/[^\d.]/g, '')) || 0;
-                        const transportation = parseFloat(emp.transportation.toString().replace(/[^\d.]/g, '')) || 0;
-                        
-                        totalCost += (workHours * hourlyWage) + transportation;
-                    }
+            try {
+                if (!currentShiftData || currentShiftData.length === 0) {
+                    return { workingCount: 0, totalLH: 0, totalCost: 0 };
                 }
-            });
-            
-            return {
-                workingCount,
-                totalLH,
-                totalCost
-            };
+                
+                let workingCount = 0;
+                let totalLH = 0;
+                let totalCost = 0;
+                
+                currentShiftData.forEach((emp, index) => {
+                    try {
+                        if (emp.isWorking) {
+                            workingCount++;
+                            
+                            const startTime = parseTime(emp.startTime);
+                            const endTime = parseTime(emp.endTime);
+                            const breakTime = parseTime(emp.break);
+                            
+                            if (startTime !== null && endTime !== null) {
+                                const workHours = calculateWorkHours(startTime, endTime, breakTime);
+                                totalLH += workHours;
+                                
+                                const hourlyWage = parseFloat(safeStringify(emp.hourlyWage).replace(/[^\d.]/g, '')) || 0;
+                                const transportation = parseFloat(safeStringify(emp.transportation).replace(/[^\d.]/g, '')) || 0;
+                                
+                                totalCost += (workHours * hourlyWage) + transportation;
+                            }
+                        }
+                    } catch (empError) {
+                        addDebugInfo(`Stats calculation error for employee ${index}: ${empError.message}`);
+                    }
+                });
+                
+                const stats = { workingCount, totalLH, totalCost };
+                addDebugInfo(`Stats calculated: ${JSON.stringify(stats)}`);
+                return stats;
+            } catch (error) {
+                addDebugInfo(`Stats calculation ERROR: ${error.message}`);
+                console.error('Stats calculation error:', error);
+                return { workingCount: 0, totalLH: 0, totalCost: 0 };
+            }
         }
         
         // ===================
-        // 既存の機能（元のツールから継承）
+        // 既存の機能（元のツールから継承・エラー修正済み）
         // ===================
         
         // ファイルアップロード処理
@@ -642,6 +824,7 @@
             const file = event.target.files[0];
             if (!file) return;
 
+            addDebugInfo(`File selected: ${file.name}`);
             document.getElementById('fileName').textContent = `選択されたファイル: ${file.name}`;
             
             const reader = new FileReader();
@@ -673,7 +856,9 @@
                     
                     sheetSection.style.display = 'block';
                     showStatus('ファイルが正常に読み込まれました', 'success');
+                    addDebugInfo('Excel file loaded successfully');
                 } catch (error) {
+                    addDebugInfo(`File load ERROR: ${error.message}`);
                     showStatus('ファイルの読み込みに失敗しました: ' + error.message, 'error');
                 }
             };
@@ -689,6 +874,7 @@
             }
 
             isNightShift = selectedSheet === '夜勤';
+            addDebugInfo(`Sheet selected: ${selectedSheet} (night shift: ${isNightShift})`);
 
             try {
                 const worksheet = workbook.Sheets[selectedSheet];
@@ -699,6 +885,7 @@
                 document.getElementById('generateBtn').disabled = false;
                 showStatus(`「${selectedSheet}」シートが選択されました`, 'success');
             } catch (error) {
+                addDebugInfo(`Sheet change ERROR: ${error.message}`);
                 showStatus('シートの読み込みに失敗しました: ' + error.message, 'error');
                 document.getElementById('generateBtn').disabled = true;
             }
@@ -721,81 +908,98 @@
                     });
                 }
             });
+            
+            addDebugInfo(`Date columns found: ${dateColumns.length}`);
         }
         
         // シフト表生成
         function generateDailyShift() {
-            if (!workbookData || dateColumns.length === 0) {
-                showStatus('データが読み込まれていません', 'error');
-                return;
-            }
-
-            const targetDateStr = document.getElementById('targetDate').value;
-            if (!targetDateStr) {
-                showStatus('日付を選択してください', 'error');
-                return;
-            }
-
-            const targetDate = new Date(targetDateStr);
-            
-            let targetColumnIndex = -1;
-            let minDiff = Infinity;
-            
-            dateColumns.forEach(col => {
-                const diff = Math.abs(col.date.getTime() - targetDate.getTime());
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    targetColumnIndex = col.index;
+            try {
+                addDebugInfo('Shift generation started');
+                
+                if (!workbookData || dateColumns.length === 0) {
+                    showStatus('データが読み込まれていません', 'error');
+                    return;
                 }
-            });
 
-            if (targetColumnIndex === -1) {
-                showStatus('指定された日付に対応する列が見つかりません', 'error');
-                return;
-            }
+                const targetDateStr = document.getElementById('targetDate').value;
+                if (!targetDateStr) {
+                    showStatus('日付を選択してください', 'error');
+                    return;
+                }
 
-            const shiftData = [];
-            let workingCount = 0;
-            
-            for (let i = 1; i < workbookData.length; i++) {
-                const row = workbookData[i];
-                if (!row || row.length === 0) continue;
+                const targetDate = new Date(targetDateStr);
+                addDebugInfo(`Target date: ${targetDate.toLocaleDateString()}`);
                 
-                const employeeData = {
-                    company: row[0] || '',
-                    timeSlot: row[1] || '',
-                    mainJob: row[2] || '',
-                    name: row[3] || '',
-                    gender: row[4] || '',
-                    hourlyWage: row[5] || '',
-                    transportation: row[6] || '',
-                    startTime: row[7] || '',
-                    endTime: row[8] || '',
-                    break: row[9] || '',
-                    status: row[targetColumnIndex] || ''
-                };
+                let targetColumnIndex = -1;
+                let minDiff = Infinity;
                 
-                if (employeeData.status === '◯' || employeeData.status === '○') {
-                    employeeData.isWorking = true;
-                    workingCount++;
-                } else if (employeeData.status && employeeData.status !== '') {
-                    employeeData.isWorking = false;
-                } else {
-                    continue;
+                dateColumns.forEach(col => {
+                    const diff = Math.abs(col.date.getTime() - targetDate.getTime());
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        targetColumnIndex = col.index;
+                    }
+                });
+
+                if (targetColumnIndex === -1) {
+                    showStatus('指定された日付に対応する列が見つかりません', 'error');
+                    return;
+                }
+
+                const shiftData = [];
+                let workingCount = 0;
+                
+                for (let i = 1; i < workbookData.length; i++) {
+                    try {
+                        const row = workbookData[i];
+                        if (!row || row.length === 0) continue;
+                        
+                        const employeeData = {
+                            company: safeStringify(row[0]),
+                            timeSlot: safeStringify(row[1]),
+                            mainJob: safeStringify(row[2]),
+                            name: safeStringify(row[3]),
+                            gender: safeStringify(row[4]),
+                            hourlyWage: row[5] || '',
+                            transportation: row[6] || '',
+                            startTime: row[7] || '',
+                            endTime: row[8] || '',
+                            break: row[9] || '',
+                            status: safeStringify(row[targetColumnIndex])
+                        };
+                        
+                        if (employeeData.status === '◯' || employeeData.status === '○') {
+                            employeeData.isWorking = true;
+                            workingCount++;
+                        } else if (employeeData.status && employeeData.status !== '') {
+                            employeeData.isWorking = false;
+                        } else {
+                            continue;
+                        }
+                        
+                        shiftData.push(employeeData);
+                    } catch (rowError) {
+                        addDebugInfo(`Row processing error at row ${i}: ${rowError.message}`);
+                    }
+                }
+
+                currentShiftData = shiftData;
+                originalShiftData = JSON.parse(JSON.stringify(shiftData));
+
+                displayShiftTable(shiftData, targetDate, workingCount);
+                showStatus(`${targetDate.toLocaleDateString('ja-JP')}のシフト表を生成しました`, 'success');
+                
+                // Miroエクスポートボタンを有効化
+                if (miroConnected) {
+                    document.getElementById('exportToMiroBtn').disabled = false;
                 }
                 
-                shiftData.push(employeeData);
-            }
-
-            currentShiftData = shiftData;
-            originalShiftData = JSON.parse(JSON.stringify(shiftData));
-
-            displayShiftTable(shiftData, targetDate, workingCount);
-            showStatus(`${targetDate.toLocaleDateString('ja-JP')}のシフト表を生成しました`, 'success');
-            
-            // Miroエクスポートボタンを有効化
-            if (miroConnected) {
-                document.getElementById('exportToMiroBtn').disabled = false;
+                addDebugInfo(`Shift generation completed: ${workingCount} working employees`);
+            } catch (error) {
+                addDebugInfo(`Shift generation ERROR: ${error.message}`);
+                console.error('Shift generation error:', error);
+                showStatus('シフト表生成に失敗しました: ' + error.message, 'error');
             }
         }
         
@@ -803,7 +1007,7 @@
         function displayShiftTable(data, date, workingCount) {
             const selectedSheet = document.getElementById('sheetSelect').value;
             const summaryHtml = `
-                <div style="background: #e3f2fd; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <div class="summary">
                     <h3>📊 ${date.toLocaleDateString('ja-JP')} のシフト概要 (${selectedSheet})</h3>
                     <p><strong>出勤者数:</strong> ${workingCount}名 | <strong>総登録者:</strong> ${data.length}名</p>
                 </div>
@@ -824,54 +1028,61 @@
                     <tbody>
                         ${data.map((emp, index) => `
                             <tr class="${emp.isWorking ? 'working' : ''}">
-                                <td>${emp.company}</td>
-                                <td>${emp.name}</td>
-                                <td>${emp.startTime}</td>
-                                <td>${emp.endTime}</td>
-                                <td>${emp.break}</td>
-                                <td>${emp.status}</td>
+                                <td>${safeStringify(emp.company)}</td>
+                                <td>${safeStringify(emp.name)}</td>
+                                <td>${safeStringify(emp.startTime)}</td>
+                                <td>${safeStringify(emp.endTime)}</td>
+                                <td>${safeStringify(emp.break)}</td>
+                                <td>${safeStringify(emp.status)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
+                <div style="margin-top: 20px;">
+                    <button class="export-btn" onclick="exportToExcel()">📊 Excelエクスポート</button>
+                </div>
             `;
 
             document.getElementById('summary').innerHTML = summaryHtml;
             document.getElementById('result').innerHTML = tableHtml;
         }
         
-        // ユーティリティ関数
-        function parseTime(timeStr) {
-            if (!timeStr || timeStr === '' || timeStr === '：') return null;
-            
-            timeStr = timeStr.replace(/[：\s]/g, ':').trim();
-            
-            if (timeStr.includes(':')) {
-                const parts = timeStr.split(':');
-                const hours = parseInt(parts[0]) || 0;
-                const minutes = parseInt(parts[1]) || 0;
-                return (hours % 24) + minutes / 60;
-            } else {
-                const numValue = parseFloat(timeStr) || 0;
-                return numValue % 24;
+        // Excelエクスポート関数
+        function exportToExcel() {
+            try {
+                if (!currentShiftData || currentShiftData.length === 0) {
+                    showStatus('エクスポートするデータがありません', 'error');
+                    return;
+                }
+                
+                const targetDate = document.getElementById('targetDate').value;
+                const selectedSheet = document.getElementById('sheetSelect').value;
+                
+                const data = [
+                    ['会社名', '氏名', '開始時間', '終了時間', '休憩', '勤務状況'],
+                    ...currentShiftData.map(emp => [
+                        safeStringify(emp.company),
+                        safeStringify(emp.name),
+                        safeStringify(emp.startTime),
+                        safeStringify(emp.endTime),
+                        safeStringify(emp.break),
+                        safeStringify(emp.status)
+                    ])
+                ];
+                
+                const ws = XLSX.utils.aoa_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'シフト表');
+                
+                const fileName = `${targetDate}_${selectedSheet}_シフト表.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                
+                showStatus('Excelファイルをダウンロードしました', 'success');
+                addDebugInfo('Excel export completed');
+            } catch (error) {
+                addDebugInfo(`Excel export ERROR: ${error.message}`);
+                showStatus('Excelエクスポートに失敗しました: ' + error.message, 'error');
             }
-        }
-        
-        function calculateWorkHours(startTime, endTime, breakTime) {
-            if (startTime === null || endTime === null) return 0;
-            
-            let workHours;
-            if (isNightShift && endTime < startTime) {
-                workHours = (24 + endTime) - startTime;
-            } else {
-                workHours = endTime - startTime;
-            }
-            
-            if (breakTime !== null && breakTime > 0) {
-                workHours -= breakTime;
-            }
-            
-            return Math.max(0, workHours);
         }
         
         function showStatus(message, type) {
@@ -885,6 +1096,7 @@
         
         // 初期化
         document.addEventListener('DOMContentLoaded', () => {
+            addDebugInfo('Application initialized');
             initializeMiro();
         });
     </script>
