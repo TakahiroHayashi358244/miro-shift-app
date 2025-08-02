@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#2196F3">
     <meta name="description" content="プロフェッショナルシフト管理アプリ - Excel連携・基準UPH自動抽出対応">
     
-    <title>シフト管理プロ v4.1 - 完全版（基準UPH自動抽出）</title>
+    <title>シフト管理プロ v4.1 - iOS対応版（基準UPH自動抽出）</title>
     
     <link rel="icon" type="image/x-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9IiMyMTk2RjMiIHJ4PSI0Ii8+PHBhdGggZD0iTTYgOWgxMnYySDE2em0wIDRoMTJ2MkgxNnptMC00aDEyVjlIMTZ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==">
     
@@ -61,6 +61,39 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(255, 152, 0, 0.3);
             background: linear-gradient(45deg, #F57C00, #FF9800);
+        }
+
+        /* iOS対応の緊急修正 */
+        .ios-notice {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideDown 0.6s ease-out;
+        }
+
+        .ios-notice h4 {
+            color: #856404;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .ios-notice p {
+            color: #856404;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .ios-notice ul {
+            color: #856404;
+            margin-left: 20px;
+            line-height: 1.5;
+        }
+
+        .ios-notice li {
+            margin-bottom: 4px;
         }
 
         * {
@@ -233,6 +266,11 @@
             cursor: pointer;
             position: relative;
             overflow: hidden;
+            min-height: 160px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .upload-zone:hover,
@@ -240,6 +278,21 @@
             border-color: var(--primary-color);
             background: linear-gradient(45deg, rgba(33, 150, 243, 0.05), rgba(76, 175, 80, 0.05));
             transform: translateY(-2px);
+        }
+
+        /* iOS Safari 対応の重要な修正 */
+        @supports (-webkit-touch-callout: none) {
+            .upload-zone {
+                -webkit-tap-highlight-color: transparent;
+                user-select: none;
+                min-height: 180px;
+                padding: 60px 24px;
+            }
+            
+            .upload-zone:active {
+                background: linear-gradient(45deg, rgba(33, 150, 243, 0.1), rgba(76, 175, 80, 0.1));
+                transform: scale(0.98);
+            }
         }
 
         .upload-icon {
@@ -259,6 +312,7 @@
         .upload-hint {
             color: var(--text-secondary);
             font-size: 0.9rem;
+            line-height: 1.4;
         }
 
         .file-input {
@@ -266,6 +320,14 @@
             inset: 0;
             opacity: 0;
             cursor: pointer;
+            z-index: 10;
+        }
+
+        /* iOS向けファイル入力の調整 */
+        @media (max-width: 768px) {
+            .file-input {
+                pointer-events: none;
+            }
         }
 
         .progress-container {
@@ -881,6 +943,15 @@
 
             .upload-zone {
                 padding: 32px 16px;
+                min-height: 140px;
+            }
+
+            .upload-icon {
+                font-size: 4rem;
+            }
+
+            .upload-text {
+                font-size: 1.3rem;
             }
 
             .date-controls {
@@ -965,7 +1036,8 @@
             .install-btn,
             .theme-toggle,
             .row-reset-btn,
-            .row-confirm-btn {
+            .row-confirm-btn,
+            .ios-notice {
                 display: none;
             }
 
@@ -979,13 +1051,25 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- iOS対応案内（条件付きで表示） -->
+        <div class="ios-notice" id="iosNotice">
+            <h4>📱 iPhone/iPadをご利用の方へ</h4>
+            <p>ファイルアップロードができない場合は、以下をお試しください：</p>
+            <ul>
+                <li><strong>Chrome for iOS</strong>ブラウザでアクセス</li>
+                <li><strong>WiFi接続</strong>で利用（モバイルデータは制限あり）</li>
+                <li>ファイルサイズを<strong>2MB以下</strong>に調整</li>
+                <li>設定 → Safari → 詳細 → 実験的機能 → "Enable experimental network loader"をOFF</li>
+            </ul>
+        </div>
+
         <header class="header">
             <div class="header-content">
                 <div class="logo-section">
                     <div class="logo">📊</div>
                     <div>
                         <h1 class="title">シフト管理プロ</h1>
-                        <p class="subtitle">Professional Shift Management v4.1 完全版（基準UPH自動抽出）</p>
+                        <p class="subtitle">Professional Shift Management v4.1 iOS対応版（基準UPH自動抽出）</p>
                     </div>
                 </div>
                 <div class="header-actions">
@@ -1009,15 +1093,24 @@
                     <h2 class="step-title">Excelファイルをアップロード</h2>
                     <p class="step-description">月間シフト表のExcelファイル（.xlsx/.xls）をドラッグ＆ドロップまたはクリックして選択<br>
                     📈 基準UPHが自動的に検出され、日付に応じて反映されます<br>
-                    ⚠️ 会社名が空白の行は自動的に除外されます</p>
+                    ⚠️ 会社名が空白の行は自動的に除外されます<br>
+                    📱 iOS: 最大2MB / その他: 最大10MB</p>
                 </div>
             </div>
             
             <div class="upload-zone" id="uploadZone">
                 <div class="upload-icon">📁</div>
                 <div class="upload-text">ファイルをクリックまたはドラッグ＆ドロップ</div>
-                <div class="upload-hint">Excelファイル（.xlsx/.xls）を選択してください</div>
-                <input type="file" class="file-input" id="fileInput" accept=".xlsx,.xls">
+                <div class="upload-hint">
+                    Excelファイル（.xlsx/.xls）を選択してください<br>
+                    <small id="fileSizeLimit">最大サイズ: 検出中...</small>
+                </div>
+                <input 
+                    type="file" 
+                    class="file-input" 
+                    id="fileInput" 
+                    accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,.xlsx,.xls"
+                >
             </div>
             
             <div class="progress-container" id="progressContainer">
@@ -1129,6 +1222,23 @@
         let isNightShift = false;
         let deferredPrompt = null;
         let isUPHAutoExtracted = false;
+        let isProcessing = false; // iOS対応: 重複処理防止
+
+        // iOS検出関数（緊急修正）
+        function isIOSDevice() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+
+        // ブラウザ検出関数（緊急修正）
+        function getBrowserInfo() {
+            const ua = navigator.userAgent;
+            return {
+                isIOS: isIOSDevice(),
+                isSafari: /Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua),
+                isChrome: /CriOS/.test(ua),
+                isFirefox: /FxiOS/.test(ua)
+            };
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
@@ -1143,6 +1253,16 @@
             document.getElementById('targetDate').addEventListener('change', handleDateChange);
             loadTheme();
             cleanupOldTransferData();
+            
+            // iOS対応案内の表示判定（緊急修正）
+            const browserInfo = getBrowserInfo();
+            if (browserInfo.isIOS) {
+                document.getElementById('iosNotice').style.display = 'block';
+                // ファイルサイズ制限の表示更新
+                document.getElementById('fileSizeLimit').textContent = 'iOS: 最大2MB';
+            } else {
+                document.getElementById('fileSizeLimit').textContent = '最大10MB';
+            }
             
             if (window.location.protocol === 'file:') {
                 setTimeout(showFileProtocolWarning, 2000);
@@ -1262,31 +1382,57 @@
             }
         }
 
+        // iOS対応のファイルアップロード設定（緊急修正）
         function setupFileUpload() {
             const uploadZone = document.getElementById('uploadZone');
             const fileInput = document.getElementById('fileInput');
+            const browserInfo = getBrowserInfo();
 
-            uploadZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadZone.classList.add('drag-over');
-            });
+            if (browserInfo.isIOS) {
+                console.log('iOS デバイスを検出しました');
+                
+                // iOS用のタッチイベント処理
+                uploadZone.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    if (!isProcessing) {
+                        fileInput.click();
+                    }
+                }, { passive: false });
 
-            uploadZone.addEventListener('dragleave', (e) => {
-                e.preventDefault();
-                uploadZone.classList.remove('drag-over');
-            });
+                uploadZone.addEventListener('touchend', function(e) {
+                    e.preventDefault();
+                }, { passive: false });
 
-            uploadZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadZone.classList.remove('drag-over');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    handleFileSelect(files[0]);
-                }
-            });
+                // ドラッグ&ドロップを無効化
+                uploadZone.style.borderStyle = 'solid';
+                
+            } else {
+                // デスクトップ版のドラッグ&ドロップ
+                uploadZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadZone.classList.add('drag-over');
+                });
 
+                uploadZone.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    uploadZone.classList.remove('drag-over');
+                });
+
+                uploadZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadZone.classList.remove('drag-over');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        handleFileSelect(files[0]);
+                    }
+                });
+            }
+
+            // 共通のクリックイベント
             uploadZone.addEventListener('click', () => {
-                fileInput.click();
+                if (!isProcessing) {
+                    fileInput.click();
+                }
             });
 
             fileInput.addEventListener('change', (e) => {
@@ -1296,15 +1442,36 @@
             });
         }
 
+        // iOS対応のファイル処理（緊急修正）
         function handleFileSelect(file) {
+            if (isProcessing) {
+                showStatus('現在処理中です。お待ちください。', 'error');
+                return;
+            }
+
             if (!file.name.match(/\.(xlsx|xls)$/i)) {
                 showStatus('Excelファイル（.xlsx/.xls）を選択してください', 'error');
                 return;
             }
+
+            // iOS対応: ファイルサイズ制限（緊急修正）
+            const browserInfo = getBrowserInfo();
+            const maxSize = browserInfo.isIOS ? 2 * 1024 * 1024 : 10 * 1024 * 1024; // iOS: 2MB, その他: 10MB
+            
+            if (file.size > maxSize) {
+                const maxMB = browserInfo.isIOS ? '2MB' : '10MB';
+                showStatus(`ファイルサイズが${maxMB}を超えています（${formatFileSize(file.size)}）`, 'error');
+                return;
+            }
+
+            isProcessing = true;
             showProgress(true);
+            
+            // iOS向けの遅延処理（緊急修正）
+            const delay = browserInfo.isIOS ? 800 : 200;
             setTimeout(() => {
                 processFile(file);
-            }, 100);
+            }, delay);
         }
 
         function showProgress(show, progress = 0) {
@@ -1329,6 +1496,7 @@
             }
         }
 
+        // iOS対応のファイル処理強化（緊急修正）
         function processFile(file) {
             const reader = new FileReader();
             
@@ -1342,20 +1510,56 @@
             reader.onload = function(e) {
                 try {
                     showProgress(true, 90);
+                    
+                    // XLSX.js の存在確認（緊急修正）
+                    if (typeof XLSX === 'undefined') {
+                        throw new Error('XLSX.jsライブラリが読み込まれていません');
+                    }
+                    
                     const data = new Uint8Array(e.target.result);
-                    workbook = XLSX.read(data, { type: 'array' });
+                    workbook = XLSX.read(data, { 
+                        type: 'array',
+                        cellStyles: true,
+                        cellNF: false,
+                        sheetStubs: false
+                    });
+                    
                     document.getElementById('fileName').textContent = `✅ ${file.name} (${formatFileSize(file.size)})`;
                     document.getElementById('fileInfo').style.display = 'block';
                     setupSheetSelection();
                     showProgress(false);
                     showStatus('ファイルが正常に読み込まれました', 'success');
+                    
                 } catch (error) {
+                    console.error('ファイル処理エラー:', error);
                     showProgress(false);
                     showStatus('ファイルの読み込みに失敗しました: ' + error.message, 'error');
+                } finally {
+                    isProcessing = false;
                 }
             };
             
-            reader.readAsArrayBuffer(file);
+            reader.onerror = function(error) {
+                console.error('FileReader エラー:', error);
+                showProgress(false);
+                showStatus('ファイルの読み込み中にエラーが発生しました', 'error');
+                isProcessing = false;
+            };
+
+            reader.onabort = function() {
+                showProgress(false);
+                showStatus('ファイル読み込みが中断されました', 'error');
+                isProcessing = false;
+            };
+            
+            try {
+                reader.readAsArrayBuffer(file);
+            } catch (error) {
+                console.error('ファイル読み込み開始エラー:', error);
+                showProgress(false);
+                showStatus('ファイルの読み込みを開始できませんでした: ' + error.message, 'error');
+                isProcessing = false;
+            }
         }
 
         function formatFileSize(bytes) {
@@ -2515,7 +2719,7 @@
 1. 実行: php -S localhost:8000
 2. ブラウザで: http://localhost:8000
 
-サーバー起動後、http://localhost:8000/test.html にアクセスしてください。
+サーバー起動後、http://localhost:8000 にアクセスしてください。
 `;
             
             alert(instructions);
