@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>単日シフト表作成ツール</title>
+    <title>シフト表作成ツール</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
@@ -778,7 +778,7 @@
                 <div class="summary">
                     <h3>📊 ${date.toLocaleDateString('ja-JP')} のシフト概要 (${selectedSheet})</h3>
                     <p><strong>出勤者数:</strong> ${workingCount}名 | <strong>総登録者:</strong> ${data.length}名</p>
-                    <p style="color: #666; font-size: 14px; margin-top: 10px;">💡 メイン業務（紫色）・開始時間・終了時間・休憩時間（オレンジ色）・勤務状況（黄色）は直接編集できます<br>
+                    <p style="color: #666; font-size: 14px; margin-top: 10px;">💡 直接編集できます<br>
                     ⚡ 時間を入力すると自動で出勤状態になり、勤務状況の○を削除すると時間がクリアされます<br>
                     🌙 夜勤では日をまたぐ勤務時間を自動で計算します（例：23:00-07:00 = 8時間）<br>
                     📝 会社名が空欄の行は表示されません</p>
