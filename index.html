@@ -738,6 +738,11 @@
                     status: row[targetColumnIndex] || ''
                 };
                 
+                // 会社名が空欄の場合はスキップ
+                if (!employeeData.company || employeeData.company.trim() === '') {
+                    continue;
+                }
+                
                 // 出勤の場合のみテーブルに追加
                 if (employeeData.status === '◯' || employeeData.status === '○') {
                     employeeData.isWorking = true;
@@ -775,7 +780,8 @@
                     <p><strong>出勤者数:</strong> ${workingCount}名 | <strong>総登録者:</strong> ${data.length}名</p>
                     <p style="color: #666; font-size: 14px; margin-top: 10px;">💡 メイン業務（紫色）・開始時間・終了時間・休憩時間（オレンジ色）・勤務状況（黄色）は直接編集できます<br>
                     ⚡ 時間を入力すると自動で出勤状態になり、勤務状況の○を削除すると時間がクリアされます<br>
-                    🌙 夜勤では日をまたぐ勤務時間を自動で計算します（例：23:00-07:00 = 8時間）</p>
+                    🌙 夜勤では日をまたぐ勤務時間を自動で計算します（例：23:00-07:00 = 8時間）<br>
+                    📝 会社名が空欄の行は表示されません</p>
                 </div>
             `;
 
@@ -916,8 +922,15 @@
                     
                     if (status === '◯' || status === '○') {
                         const cells = row.querySelectorAll('td');
+                        const company = cells[0] ? cells[0].textContent.trim() : '';
+                        
+                        // 会社名が空欄の場合はスキップ
+                        if (!company || company === '') {
+                            return;
+                        }
+                        
                         attendanceData.push({
-                            company: cells[0] ? cells[0].textContent.trim() : '',
+                            company: company,
                             timeSlot: '', // 階層列は空欄
                             mainJob: cells[2] ? cells[2].textContent.trim() : '',
                             name: cells[3] ? cells[3].textContent.trim() : '',
@@ -1455,6 +1468,14 @@
                 const status = statusCell.textContent.trim();
                 
                 if (status === '◯' || status === '○') {
+                    const cells = row.querySelectorAll('td');
+                    const company = cells[0] ? cells[0].textContent.trim() : '';
+                    
+                    // 会社名が空欄の場合はスキップ
+                    if (!company || company === '') {
+                        return;
+                    }
+                    
                     workingCount++;
                     
                     const startTimeCell = row.querySelector('[data-field="startTime"]');
@@ -1754,6 +1775,12 @@
                 if (status === '◯' || status === '○') {
                     const cells = row.querySelectorAll('td');
                     const company = cells[0] ? cells[0].textContent.trim() : '';
+                    
+                    // 会社名が空欄の場合はスキップ
+                    if (!company || company === '') {
+                        return;
+                    }
+                    
                     const hourlyWageText = cells[5] ? cells[5].textContent.trim() : '';
                     const transportationText = cells[6] ? cells[6].textContent.trim() : '';
                     
@@ -1961,6 +1988,11 @@
                         isNightShift: isNight
                     };
                     
+                    // 会社名が空欄の場合はスキップ
+                    if (!employeeData.company || employeeData.company.trim() === '') {
+                        continue;
+                    }
+                    
                     // 出勤者のみを対象
                     if (employeeData.status === '◯' || employeeData.status === '○') {
                         shiftData.push(employeeData);
@@ -1995,6 +2027,12 @@
 
             allShiftData.forEach(emp => {
                 const company = emp.company.trim();
+                
+                // 会社名が空欄の場合はスキップ
+                if (!company || company === '') {
+                    return;
+                }
+                
                 const hourlyWageText = emp.hourlyWage.toString();
                 const transportationText = emp.transportation.toString();
                 
